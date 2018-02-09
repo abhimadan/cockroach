@@ -1189,7 +1189,7 @@ func (e *Executor) execSingleStatement(
 	avoidCachedDescriptors bool,
 	automaticRetryCount int,
 	res StatementResult,
-) error {
+) (err error) {
 	txnState := &session.TxnState
 	if txnState.State() == NoTxn {
 		panic("execStmt called outside of a txn")
@@ -1222,6 +1222,52 @@ func (e *Executor) execSingleStatement(
 		session.addActiveQuery(queryID, queryMeta)
 	}
 
+	// The ActiveQueries entry for this query was just added, so we don't need to
+	// acquire the lock.
+	if _, ok := session.mu.ActiveQueries[queryID]; ok && session.data.StmtTimeout != 0 {
+		timeoutChan := make(chan bool)
+
+		timeoutTimer := time.AfterFunc(time.Duration(session.data.StmtTimeout)*time.Millisecond, func() {
+			timeoutSucceeded := true
+
+			statusServer := e.cfg.StatusServer
+			queryIDString := queryID.String()
+
+			// Get the lowest 32 bits of the query ID.
+			nodeID := 0xFFFFFFFF & queryID.Lo
+
+			request := &serverpb.CancelQueryRequest{
+				NodeId:   fmt.Sprintf("%d", nodeID),
+				QueryID:  queryIDString,
+				Username: session.data.User,
+			}
+
+			response, err := statusServer.CancelQuery(session.Ctx(), request)
+			if err != nil {
+				log.Warningf(txnState.Ctx, "CancelQuery RPC failed: %s", err)
+				timeoutSucceeded = false
+			}
+
+			if !response.Canceled {
+				log.Warningf(txnState.Ctx, "could not cancel query %s: %s", queryID, response.Error)
+				timeoutSucceeded = false
+			}
+
+			timeoutChan <- timeoutSucceeded
+		})
+
+		defer func() {
+			var timedOut bool
+			if !timeoutTimer.Stop() {
+				timedOut = <-timeoutChan
+			}
+
+			if timedOut {
+				err = errors.Errorf("query execution canceled due to statement timeout")
+			}
+		}()
+	}
+
 	var stmtStrBefore string
 	// TODO(nvanbenschoten): Constant literals can change their representation (1.0000 -> 1) when type checking,
 	// so we need to reconsider how this works.
@@ -1233,7 +1279,6 @@ func (e *Executor) execSingleStatement(
 		stmtStrBefore = stmt.String()
 	}
 
-	var err error
 	// Run observer statements in a separate code path so they are
 	// always guaranteed to execute regardless of the current transaction state.
 	if _, ok := stmt.AST.(tree.ObserverStatement); ok {

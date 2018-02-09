@@ -52,6 +52,9 @@ type SessionData struct {
 	// SequenceState gives access to the SQL sequences that have been manipulated
 	// by the session.
 	SequenceState *SequenceState
+	// StmtTimeout is the maximum allowable time of a statement (in ms), starting
+	// from when the query arrives. A value of 0 indicates no timeout.
+	StmtTimeout int
 
 	mu struct {
 		syncutil.Mutex

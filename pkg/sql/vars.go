@@ -511,6 +511,26 @@ var varGen = map[string]sessionVar{
 			return enableTracing(&evalCtx.EvalContext, m, values)
 		},
 	},
+	`statement_timeout`: {
+		Set: func(
+			_ context.Context, m sessionDataMutator,
+			evalCtx *extendedEvalContext, values []tree.TypedExpr,
+		) error {
+			s, err := getSingleInt("statement_timeout", evalCtx, values)
+			if err != nil {
+				return err
+			}
+			m.SetStmtTimeout(int(*s))
+			return nil
+		},
+		Get: func(evalCtx *extendedEvalContext) string {
+			return fmt.Sprintf("%d", evalCtx.SessionData.StmtTimeout)
+		},
+		Reset: func(m sessionDataMutator) error {
+			m.SetStmtTimeout(0)
+			return nil
+		},
+	},
 }
 
 func enableTracing(evalCtx *tree.EvalContext, m sessionDataMutator, values []tree.TypedExpr) error {
@@ -574,6 +594,24 @@ func getSingleBool(
 	b, ok := val.(*tree.DBool)
 	if !ok {
 		return nil, fmt.Errorf("set %s requires a boolean value: %s is a %s",
+			name, values[0], val.ResolvedType())
+	}
+	return b, nil
+}
+
+func getSingleInt(
+	name string, evalCtx *extendedEvalContext, values []tree.TypedExpr,
+) (*tree.DInt, error) {
+	if len(values) != 1 {
+		return nil, fmt.Errorf("set %s requires a single argument", name)
+	}
+	val, err := values[0].Eval(&evalCtx.EvalContext)
+	if err != nil {
+		return nil, err
+	}
+	b, ok := val.(*tree.DInt)
+	if !ok {
+		return nil, fmt.Errorf("set %s requires an int value: %s is a %s",
 			name, values[0], val.ResolvedType())
 	}
 	return b, nil

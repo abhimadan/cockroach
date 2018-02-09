@@ -264,3 +264,40 @@ func TestCancelDistSQLQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTimeoutQuery(t *testing.T) {
+	defer leaktest.AfterTest(t)()
+
+	const timeoutSetting = "SET statement_timeout = 100"
+	const queryToTimeout = "SELECT * FROM generate_series(1,20000000)"
+
+	var conn *gosql.DB
+
+	tc := serverutils.StartTestCluster(t, 1, /* numNodes */
+		base.TestClusterArgs{
+			ReplicationMode: base.ReplicationManual,
+		})
+	defer tc.Stopper().Stop(context.TODO())
+
+	conn = tc.ServerConn(0)
+
+	if _, err := conn.Exec(timeoutSetting); err != nil {
+		t.Fatal(err)
+	}
+
+	var timeoutErr error
+
+	rows, err := conn.Query(queryToTimeout)
+	if err != nil {
+		timeoutErr = err
+	}
+	for rows.Next() {
+	}
+	if err = rows.Err(); err != nil {
+		timeoutErr = err
+	}
+
+	if !sqlbase.IsQueryCanceledError(timeoutErr) {
+		t.Fatal(timeoutErr)
+	}
+}

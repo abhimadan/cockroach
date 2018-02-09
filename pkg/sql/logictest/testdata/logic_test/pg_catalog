@@ -1149,6 +1149,7 @@ server_version_num             90500         NULL      NULL        NULL        s
 session_user                   root          NULL      NULL        NULL        string
 sql_safe_updates               false         NULL      NULL        NULL        string
 standard_conforming_strings    on            NULL      NULL        NULL        string
+statement_timeout              0             NULL      NULL        NULL        string
 timezone                       UTC           NULL      NULL        NULL        string
 tracing                        off           NULL      NULL        NULL        string
 transaction_isolation          serializable  NULL      NULL        NULL        string
@@ -1178,6 +1179,7 @@ server_version_num             90500         NULL  user     NULL      90500     
 session_user                   root          NULL  user     NULL      root          root
 sql_safe_updates               false         NULL  user     NULL      false         false
 standard_conforming_strings    on            NULL  user     NULL      on            on
+statement_timeout              0             NULL  user     NULL      0             0
 timezone                       UTC           NULL  user     NULL      UTC           UTC
 tracing                        off           NULL  user     NULL      off           off
 transaction_isolation          serializable  NULL  user     NULL      serializable  serializable
@@ -1207,6 +1209,7 @@ server_version_num             NULL    NULL     NULL     NULL        NULL
 session_user                   NULL    NULL     NULL     NULL        NULL
 sql_safe_updates               NULL    NULL     NULL     NULL        NULL
 standard_conforming_strings    NULL    NULL     NULL     NULL        NULL
+statement_timeout              NULL    NULL     NULL     NULL        NULL
 timezone                       NULL    NULL     NULL     NULL        NULL
 tracing                        NULL    NULL     NULL     NULL        NULL
 transaction_isolation          NULL    NULL     NULL     NULL        NULL
